@@ -34,10 +34,11 @@ def window_image(image, window_center, window_width):
     return window_image
 
 def mask_only(file_path, display=False):
-    medical_image = pydicom.read_file(file_path, force=True)
+    medical_image = pydicom.dcmread(file_path, force=True)
     image = medical_image.pixel_array
-    
     hu_image = transform_to_hu(medical_image, image)
+    medical_image = pydicom.dcmread(file_path)
+    hu_image = medical_image.set_pixel_data()
     thresholded_image = window_image(hu_image, 40, 80)
     
     segmentation = morphology.dilation(thresholded_image, np.ones((4, 4)))
@@ -50,7 +51,7 @@ def mask_only(file_path, display=False):
     
     # Improve the mask
     mask = morphology.dilation(mask, np.ones((1, 1)))
-    mask = ndimage.morphology.binary_fill_holes(mask)
+    mask = ndimage.binary_fill_holes(mask)
     mask = morphology.dilation(mask, np.ones((3, 3)))
     
     masked_image = mask * thresholded_image
@@ -112,7 +113,7 @@ def boolean_masking(file_path, display=False):
         # Save into DCM
         print('entering bool mask try')
         CTimg = pydicom.dcmread(file_path)
-        CTimg.PixelData = image
+        CTimg.PixelData = image.astype(np.uint16).tobytes()
         CTimg.save_as(path)
         print('out of the bool mask')
     except AttributeError:
@@ -147,13 +148,13 @@ def is_dicom_image(file: str) -> bool:
     return result
 
 # The below forloop should run in the directory housing all the DCMs
-pwd = os.getcwd()
+external_drive_path= r'C:\Users\mmconno2\NMDIDstage1\USB DISK\case-100335\omi\incomingdir\case-100335\STANDARD_HEAD-NECK-U-EXT'
 
 file_list = list()
 file_notdcm = list()
 path_list = list()
 
-for root, dirs, files in os.walk(pwd):
+for root, dirs, files in os.walk(external_drive_path):
     for name in files:
         if name.lower().endswith('.dcm'):
             file_list.append(os.path.join(root, name))

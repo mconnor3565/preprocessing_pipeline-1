@@ -14,6 +14,7 @@ import time
 import pydicom
 import pandas as pd
 
+
 def is_dicom_image(file: str) -> bool:
     # Boolean specifying if the file in question is a proper DICOM file with an image
     result = False
@@ -41,11 +42,12 @@ def delete_notdcm(directory):
     # load the txt list from is_dicom_image to for-loop below
     
     for root, dirs, files in os.walk(directory):
-        for name in files:
-            if name.lower().endswith('notproper.txt'):
-                txt_file = open('notproper.txt', 'r')
-                file_notdcm = txt_file.readlines
-                txt_file.close()                
+        for dir in dirs:
+            for name in files:
+                if name.lower().endswith('notproper.txt'):
+                    txt_file = open('notproper.txt', 'r')
+                    file_notdcm = txt_file.readlines
+                    txt_file.close()                
         
     for file in file_notdcm:
         os.remove(file)
@@ -53,6 +55,15 @@ def delete_notdcm(directory):
     elapsed_time = et - st
     print('deleting corrupt files took:', elapsed_time, 'seconds')
     
+external_drive_path= "C:/Users/mmconno2/NMDIDstage1/USB Disk"
+for root, dirs, files in os.walk(external_drive_path):
+    for dir in dirs:
+       for file in files:
+            file_path = os.path.join(root, file)
+            is_dicom_image(file_path)
+
+
+
 pwd = os.getcwd()
 
 file_list = list()
@@ -63,7 +74,10 @@ for path in file_list:
     if x == True:
         path_list.append(path)
         
-if len(path_list = 0):
+if len(path_list)==0:
     print('there are no nondcm files in this directory')
-
+    
 delete_notdcm(pwd)
+
+
+
