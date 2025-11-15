@@ -1,0 +1,4 @@
+use powershell to copy files from hard drive
+Copy-Item -Path "D:\case-100335" -Destination "C:\Users\mmconno2\research-testingstage1"
+
+Copy-Item -Path "D:\" -Destination "C:\Users\mmconno2\NMDIDstage1"
