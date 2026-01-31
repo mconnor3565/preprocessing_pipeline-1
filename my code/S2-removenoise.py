@@ -10,6 +10,7 @@ For loop allows all DCMs in the directory to be processed
 """
 # Packages required
 import pydicom
+import copy
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -19,8 +20,10 @@ from skimage import morphology
 # Functions required
 def transform_to_hu(medical_image, image):
 
-    intercept = medical_image.RescaleIntercept
-    slope = medical_image.RescaleSlope
+    intercept = getattr(medical_image, 'RescaleIntercept', 0.0)
+    print(intercept)
+    slope = getattr(medical_image, 'RescaleSlope', 1.0)
+    print(slope)
     hu_image = image * slope + intercept
 
     return hu_image
@@ -28,7 +31,8 @@ def transform_to_hu(medical_image, image):
 def window_image(image, window_center, window_width):
     img_min = window_center - window_width // 2
     img_max = window_center + window_width // 2
-    window_image = image.copy()
+    window_image = copy.deepcopy(image) 
+
     window_image[window_image < img_min] = img_min
     window_image[window_image > img_max] = img_max
     
@@ -55,42 +59,52 @@ def mask_only(file_path, display=False):
     mask = morphology.dilation(mask, np.ones((3, 3)))
     
     masked_image = mask * thresholded_image
-    
+    plt.subplot(142)
+    plt.imshow(mask)
+    plt.title('Mask')
+    plt.axis('off')
+    plt.show()
+
     if display:
         plt.figure(figsize=(15, 2.5))
         plt.subplot(141)
         plt.imshow(thresholded_image)
         plt.title('Original Image')
         plt.axis('off')
+        plt.show()
         
         plt.subplot(142)
         plt.imshow(mask)
         plt.title('Mask')
         plt.axis('off')
+        plt.show()
 
         plt.subplot(143)
         plt.imshow(masked_image)
         plt.title('Final Image')
-        plt.axis('off')       
+        plt.axis('off')
+        plt.show()
     
-    return mask
+    return mask   
+
 
 def mask_array(file_path):
     mask = mask_only(file_path, display=False)
-    # print(mask)
+    #print(mask)
 
     # Invert the bool array generated in mask_only function
     inverted_mask = np.logical_not(mask)
     # check inveted_mask array
-    # print(inverted_mask)
+    #print(inverted_mask)
 
     # turn inverted_mask into int array
-    inverted_mask_int = inverted_mask.astype(int)
+    inverted_mask_int = np.where(inverted_mask, 1, 0)
     # check inveted_mask_int array
-    # print(inverted_mask_int)
+    #print(inverted_mask_int)
 
     # find minimum value in dcm
-    image = pydicom.dcmread(file_path).pixel_array
+    image = pydicom.dcmread(file_path)
+    image = image.pixel_array
     minval = np.min(image)
 
     # replace _int 1s with min_img[0] aka minval
@@ -113,8 +127,8 @@ def boolean_masking(file_path, display=False):
         # Save into DCM
         print('entering bool mask try')
         CTimg = pydicom.dcmread(file_path)
-        CTimg.PixelData = image.astype(np.uint16).tobytes()
-        CTimg.save_as(path)
+        CTimg.set_pixel_data(image, photometric_interpretation= "MONOCHROME2", BitsStored=12)
+        CTimg.save_as(external_drive_path)
         print('out of the bool mask')
     except AttributeError:
         with open("corrupted.txt", "a") as corrupt_file:
@@ -125,60 +139,61 @@ def boolean_masking(file_path, display=False):
 
     if display:
         plt.imshow(image)
+        plt.show()
         
     return image
 
 # Function to avoid dcms that are not proper DICOM files readable image and metadata
-def is_dicom_image(file: str) -> bool:
-    # Boolean specifying if the file in question is a proper DICOM file with an image
-    # The parameters 
-    result = False
-    try:
-        img = pydicom.dcmread(file, force=True)
-        if 'TransferSyntaxUID' not in img.file_meta:
-            img.file_meta.TransferSyntaxUID = pydicom.uid.ImplicitVRLittleEndian
-        img.pixel_array
-        result = True
-    except (AttributeError, TypeError, KeyError):
-        with open("notproper.txt", "a") as proper_file: 
-            proper_file.write(str(file)+'\n')  
-            print(file + ' is not a proper DICOM file')
-        proper_file.close()
-        pass
-    return result
+# def is_dicom_image(file: str) -> bool:
+#     # Boolean specifying if the file in question is a proper DICOM file with an image
+#     # The parameters 
+#     result = False
+#     try:
+#         img = pydicom.dcmread(file, force=True)
+#         if 'TransferSyntaxUID' not in img.file_meta:
+#             img.file_meta.TransferSyntaxUID = pydicom.uid.ImplicitVRLittleEndian
+#         img.pixel_array
+#         result = True
+#     except (AttributeError, TypeError, KeyError):
+#         with open("notproper.txt", "a") as proper_file: 
+#             proper_file.write(str(file)+'\n')  
+#             print(file + ' is not a proper DICOM file')
+#         proper_file.close()
+#         pass
+#     return result
 
 # The below forloop should run in the directory housing all the DCMs
-external_drive_path= r'C:\Users\mmconno2\NMDIDstage1\USB DISK\case-100335\omi\incomingdir\case-100335\STANDARD_HEAD-NECK-U-EXT'
+external_drive_path= r'C:\Users\mmconno2\NMDIDstage1\USB DISK\case-158742\case-158742\THIN_BONE_HD-UXT - Copy\series_6\CT.1.2.840.113704.1.111.2600.1357067176.94803.dcm'
+boolean_masking(external_drive_path, display=True)
+# file_list = list()
+# file_notdcm = list()
+# path_list = list()
 
-file_list = list()
-file_notdcm = list()
-path_list = list()
-
-for root, dirs, files in os.walk(external_drive_path):
-    for name in files:
-        if name.lower().endswith('.dcm'):
-            file_list.append(os.path.join(root, name))
-            #print(file_list)
-        else:
-            file_notdcm.append(os.path.join(root,name))
-            # print(file_notdcm)     
+# for root, dirs, files in os.walk(external_drive_path):
+#     for name in files:
+#         if name.lower().endswith('.dcm'):
+#             file_list.append(os.path.join(root, name))
+#             #print(file_list)
+#         else:
+#             file_notdcm.append(os.path.join(root,name))
+#             # print(file_notdcm)     
             
-print(file_list)
-# Removes dcm files that do not have metadata and will cause the boolean masking loop to interrupt
-# from the list of paths which will be passed through the boolean_masking function
-for path in file_list:
-    x = is_dicom_image(path)
-    if x == True:
-        path_list.append(path)
-print(path_list)
-# Does the boolean masking and removes the bed
-for path in path_list[:]:
-      # file_size = os.path.getsize(path)
-      # if file_size == 0:
-      #     continue
-      # else:
-          boolean_masking(path)
-  #prints path done
-          #print(path + ' done')
-print(path_list)
+# print(file_list)
+# # Removes dcm files that do not have metadata and will cause the boolean masking loop to interrupt
+# # from the list of paths which will be passed through the boolean_masking function
+# for path in file_list:
+#     x = is_dicom_image(path)
+#     if x == True:
+#         path_list.append(path)
+# print(path_list)
+# # Does the boolean masking and removes the bed
+# for path in path_list[:]:
+#       # file_size = os.path.getsize(path)
+#       # if file_size == 0:
+#       #     continue
+#       # else:
+#           boolean_masking(path)
+#   #prints path done
+#           #print(path + ' done')
+# print(path_list)
   	
